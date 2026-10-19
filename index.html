@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>SPORTS LIVE - Mechi Zote Duniani</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<style>
+:root {
+  --bg-main: #0a0a14; --bg-header: #12122b; --accent: #6a0dad; --pink: #ff2e88;
+  --text: #f0f0ff; --muted: #888;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg-main); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+/* HEADER */
+header { background: var(--bg-header); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; border-bottom: 2px solid var(--accent); }
+h1 { font-size: 20px; color: #ffd700; letter-spacing: 2px; }
+h1 span { color: var(--pink); }
+.live-dot { display: inline-block; width: 8px; height: 8px; background: red; border-radius: 50%; margin-right: 5px; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* CHANNELS SELECTOR */
+.channels-bar { background: var(--bg-header); padding: 10px 20px; display: flex; gap: 10px; overflow-x: auto; border-bottom: 1px solid rgba(106, 13, 173, 0.3); }
+.channels-bar::-webkit-scrollbar { display: none; }
+.channel-btn { padding: 8px 15px; background: rgba(255,255,255,0.05); border: 1px solid var(--accent); color: var(--text); border-radius: 20px; white-space: nowrap; cursor: pointer; font-size: 13px; }
+.channel-btn:hover, .channel-btn.active { background: var(--accent); color: white; }
+
+/* SECTIONS */
+.section { padding: 20px; }
+.section-title { font-size: 18px; color: #ffd700; margin-bottom: 15px; border-left: 4px solid var(--pink); padding-left: 10px; }
+
+/* MATCH GRID */
+.match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+.match-card { background: var(--bg-header); border-radius: 12px; padding: 15px; border: 1px solid rgba(106, 13, 173, 0.3); transition: transform 0.3s; }
+.match-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(255,46,136,0.3); }
+.match-header { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.match-teams { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 16px; font-weight: bold; }
+.team { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; text-align: center; }
+.team img { width: 40px; height: 40px; object-fit: contain; }
+.vs { color: var(--pink); font-size: 14px; margin: 0 10px; }
+.watch-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; background: linear-gradient(90deg, var(--accent), var(--pink)); color: white; font-weight: bold; cursor: pointer; transition: opacity 0.3s; }
+.watch-btn:hover { opacity: 0.8; }
+
+/* MODAL (PLAYER) */
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; justify-content: center; align-items: center; padding: 15px; }
+.modal.active { display: flex; }
+.modal-content { width: 100%; max-width: 900px; background: #000; border-radius: 15px; overflow: hidden; position: relative; border: 2px solid var(--accent); }
+.close { position: absolute; top: 10px; right: 15px; font-size: 30px; color: white; cursor: pointer; z-index: 10; background: rgba(0,0,0,0.5); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+video { width: 100%; max-height: 80vh; display: block; }
+.loader { color: white; text-align: center; padding: 50px; font-size: 18px; }
+
+/* SEARCH */
+.search-box { width: 100%; padding: 12px 20px; border-radius: 30px; border: 1px solid var(--accent); background: var(--bg-header); color: white; outline: none; margin-bottom: 20px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ROJAX <span>SPORTS</span></h1>
+  <div style="font-size: 13px; color: var(--pink);"><span class="live-dot"></span>LIVE</div>
+</header>
+
+<!-- CHANNELS SELECTOR -->
+<div class="channels-bar">
+  <button class="channel-btn active" onclick="changeChannel('https://ddh1.mizhls.ru/lb/premium414/index.m3u8', this)">SuperSport PL</button>
+  <button class="channel-btn" onclick="changeChannel('https://ddh1.mizhls.ru/lb/premium413/index.m3u8', this)">SuperSport PSL</button>
+  <button class="channel-btn" onclick="changeChannel('https://ddh1.mizhls.ru/lb/premium415/index.m3u8', this)">SuperSport Football</button>
+  <button class="channel-btn" onclick="changeChannel('https://ddh1.mizhls.ru/lb/premium416/index.m3u8', this)">SuperSport LaLiga</button>
+</div>
+
+<div class="section">
+  <h2 class="section-title">⚽ Mechi za Leo Duniani</h2>
+  <input type="text" id="searchInput" class="search-box" placeholder="Tafuta timu (mfano: Simba, Yanga, Arsenal)..." onkeyup="filterMatches()">
+  <div id="matchesContainer" class="match-grid">
+    <div class="loader">Inatafuta mechi...</div>
+  </div>
+</div>
+
+<!-- PLAYER MODAL -->
+<div id="playerModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closePlayer()">&times;</span>
+    <video id="videoPlayer" controls playsinline autoplay></video>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. MFUMO WA KUVUTA MECHI (API)
+// ==========================================
+const API_KEY = "3"; 
+const today = new Date().toISOString().split('T')[0]; 
+const API_URL = `https://www.thesportsdb.com/api/v1/json/${API_KEY}/eventsday.php?d=${today}&s=Soccer`;
+
+let allMatches = [];
+let currentStreamUrl = "https://ddh1.mizhls.ru/lb/premium414/index.m3u8"; // Default SuperSport PL
+
+async function fetchMatches() {
+  try {
+    const response = await axios.get(API_URL);
+    if (response.data && response.data.events) {
+      allMatches = response.data.events;
+      renderMatches(allMatches);
+    } else {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const res2 = await axios.get(`https://www.thesportsdb.com/api/v1/json/${API_KEY}/eventsday.php?d=${yesterday}&s=Soccer`);
+      allMatches = res2.data.events || [];
+      renderMatches(allMatches);
+    }
+  } catch (error) {
+    console.error(error);
+    document.getElementById("matchesContainer").innerHTML = "<p style='color:red'>Imeshindwa kuvuta mechi. Angalia mtandao.</p>";
+  }
+}
+
+// ==========================================
+// 2. KUONYESHA MECHI KWENYE SCREEN
+// ==========================================
+function renderMatches(matches) {
+  const container = document.getElementById("matchesContainer");
+  container.innerHTML = "";
+
+  if (matches.length === 0) {
+    container.innerHTML = "<p style='color:var(--muted)'>Hakuna mechi zilizopatikana kwa sasa.</p>";
+    return;
+  }
+
+  matches.forEach(match => {
+    const homeLogo = match.strHomeTeamBadge || 'https://via.placeholder.com/40/12122b/ffffff?text=?';
+    const awayLogo = match.strAwayTeamBadge || 'https://via.placeholder.com/40/12122b/ffffff?text=?';
+    
+    let status = "Bado Haijaanza";
+    let statusColor = "var(--muted)";
+    if (match.strStatus === "Match Finished") { status = "Imeisha"; }
+    else if (match.strStatus === "Not Started") { status = "Bado"; }
+    else if (match.strStatus) { status = "LIVE"; statusColor = "var(--pink)"; }
+
+    const card = document.createElement("div");
+    card.className = "match-card";
+    card.setAttribute("data-teams", `${match.strHomeTeam} ${match.strAwayTeam}`.toLowerCase());
+    
+    card.innerHTML = `
+      <div class="match-header">
+        <span>${match.strLeague || 'Ligi'}</span>
+        <span style="color:${statusColor}; font-weight:bold;">${status}</span>
+      </div>
+      <div class="match-teams">
+        <div class="team">
+          <img src="${homeLogo}" alt="${match.strHomeTeam}" onerror="this.src='https://via.placeholder.com/40'">
+          <span>${match.strHomeTeam || 'Home'}</span>
+        </div>
+        <div class="vs">VS</div>
+        <div class="team">
+          <img src="${awayLogo}" alt="${match.strAwayTeam}" onerror="this.src='https://via.placeholder.com/40'">
+          <span>${match.strAwayTeam || 'Away'}</span>
+        </div>
+      </div>
+      <button class="watch-btn" onclick="openPlayer()">▶ Watch Live</button>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ==========================================
+// 3. MFUMO WA PLAYER (HLS)
+// ==========================================
+let hlsInstance = null;
+
+function changeChannel(url, btn) {
+  currentStreamUrl = url;
+  document.querySelectorAll(".channel-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  alert("Channel imebadilishwa! Bonyeza 'Watch Live' kwenye mechi yoyote kuanza kuangalia.");
+}
+
+function openPlayer() {
+  const modal = document.getElementById("playerModal");
+  const video = document.getElementById("videoPlayer");
+  
+  modal.classList.add("active");
+  
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+
+  if (currentStreamUrl.includes(".m3u8") && Hls.isSupported()) {
+    hlsInstance = new Hls({
+      // Headers za kusaidia kuepuka kuzuiwa (Error 403)
+      xhrSetup: function(xhr, url) {
+        xhr.setRequestHeader('Referer', 'https://mizhls.ru/');
+        xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      }
+    });
+    hlsInstance.loadSource(currentStreamUrl);
+    hlsInstance.attachMedia(video);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play().catch(e => {
+        console.log("Play error (Autoplay blocked?):", e);
+      });
+    });
+    hlsInstance.on(Hls.Events.ERROR, function (event, data) {
+      if (data.fatal) {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            console.log("Network error, trying to recover...");
+            hlsInstance.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            console.log("Media error, trying to recover...");
+            hlsInstance.recoverMediaError();
+            break;
+          default:
+            console.log("Unrecoverable error.");
+            alert("Imeshindwa kuplay channel hii. Jaribu nyingine.");
+            hlsInstance.destroy();
+            break;
+        }
+      }
+    });
+  } else {
+    video.src = currentStreamUrl;
+    video.play().catch(e => console.log("Play error", e));
+  }
+}
+
+function closePlayer() {
+  const modal = document.getElementById("playerModal");
+  const video = document.getElementById("videoPlayer");
+  video.pause();
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  video.src = "";
+  modal.classList.remove("active");
+}
+
+// ==========================================
+// 4. SEARCH
+// ==========================================
+function filterMatches() {
+  const query = document.getElementById("searchInput").value.toLowerCase();
+  const cards = document.querySelectorAll(".match-card");
+  
+  cards.forEach(card => {
+    const teams = card.getAttribute("data-teams");
+    if (teams.includes(query)) {
+      card.style.display = "block";
+    } else {
+      card.style.display = "none";
+    }
+  });
+}
+
+// ANZISHA
+window.addEventListener("DOMContentLoaded", fetchMatches);
+</script>
+</body>
+</html>
